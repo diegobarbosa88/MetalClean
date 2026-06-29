@@ -1,158 +1,185 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
+import { Navbar } from '@/components/layout/navbar'
+import { ScoreBadge } from '@/components/ui/score-badge'
+import { formatRate, SPECIALTY_LABELS } from '@/lib/utils'
 
-interface JobCardProps {
+export const metadata: Metadata = {
+  title: 'Vagas de Trabalho — MetalClean',
+  description: 'Vagas de soldadores, caldeireiros, tubistas e outros profissionais da metalomecânica. Valor/hora explícito em todas as ofertas.',
+}
+
+const API = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
+
+async function getJobs(searchParams: Record<string, string>) {
+  const params = new URLSearchParams()
+  if (searchParams.q) params.set('q', searchParams.q)
+  if (searchParams.specialty) params.set('specialty', searchParams.specialty)
+  if (searchParams.country) params.set('country', searchParams.country)
+  if (searchParams.minRate) params.set('minRate', searchParams.minRate)
+  if (searchParams.housing) params.set('housingIncluded', 'true')
+
+  const res = await fetch(`${API}/jobs?${params.toString()}`, { next: { revalidate: 30 } })
+  if (!res.ok) return []
+  return res.json()
+}
+
+const SPECIALTY_FILTERS = [
+  { value: '', label: 'Todos' },
+  { value: 'tig_welder', label: 'TIG' },
+  { value: 'mig_mag_welder', label: 'MIG/MAG' },
+  { value: 'boilermaker', label: 'Caldeireiro' },
+  { value: 'pipe_fitter', label: 'Tubista' },
+  { value: 'structural_fitter', label: 'Serralheiro' },
+]
+
+interface JobItem {
+  id: string
   title: string
-  company: string
-  companyScore: number
-  location: string
-  rateMin: number
-  rateMax?: number
-  housing: boolean
-  specialty: string
-  duration?: string
+  slug: string
+  specialtyRequired: string
+  hourlyRateMin: number
+  hourlyRateMax?: number
+  workLocationCity: string
+  workLocationCountry: string
+  housingIncluded: boolean
+  estimatedDurationWeeks?: number
+  applicationCount: number
   publishedAt: string
+  company: {
+    companyName: string
+    slug: string
+    scoreAvg?: number
+    reviewCount?: number
+    taxIdVerified?: boolean
+  }
 }
 
-function JobCard({
-  title, company, companyScore, location, rateMin, rateMax,
-  housing, specialty, duration, publishedAt,
-}: JobCardProps) {
-  return (
-    <article className="group rounded-xl border border-metal-700 bg-metal-900 p-5 transition-all hover:border-orange-500/50 hover:bg-metal-800">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="rounded bg-metal-700 px-2 py-0.5 text-xs font-medium text-metal-300">
-              {specialty}
-            </span>
-            {housing && (
-              <span className="rounded bg-green-900/50 px-2 py-0.5 text-xs font-medium text-green-400">
-                Alojamento
-              </span>
-            )}
-          </div>
-          <h3 className="font-semibold text-white group-hover:text-orange-400">{title}</h3>
-          <div className="mt-1 flex items-center gap-1.5 text-sm text-metal-400">
-            <span>{company}</span>
-            <span>·</span>
-            <span className="flex items-center gap-0.5">
-              <span className="text-yellow-400">★</span>
-              <span>{companyScore.toFixed(1)}</span>
-            </span>
-            <span>·</span>
-            <span>{location}</span>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-lg font-bold text-orange-400">
-            {rateMin}€{rateMax ? `–${rateMax}€` : ''}/h
-          </p>
-          {duration && <p className="text-xs text-metal-500">{duration}</p>}
-        </div>
-      </div>
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs text-metal-600">{publishedAt}</span>
-        <Link
-          href="/jobs/1"
-          className="rounded-md bg-orange-500/10 px-3 py-1.5 text-xs font-semibold text-orange-400 ring-1 ring-orange-500/20 transition-colors hover:bg-orange-500 hover:text-white"
-        >
-          Ver oferta
-        </Link>
-      </div>
-    </article>
-  )
-}
-
-export default function JobsPage() {
-  // Static placeholder data — will be replaced by API fetch
-  const jobs: JobCardProps[] = [
-    {
-      title: 'Soldador TIG — Tubagens Inox (P1/P8)',
-      company: 'INOXFER',
-      companyScore: 4.7,
-      location: 'Sines, PT',
-      rateMin: 22,
-      rateMax: 25,
-      housing: true,
-      specialty: 'TIG',
-      duration: '6 meses',
-      publishedAt: 'Há 2 horas',
-    },
-    {
-      title: 'Caldeireiro — Construção de Reservatórios',
-      company: 'Setúbal Steel',
-      companyScore: 4.2,
-      location: 'Setúbal, PT',
-      rateMin: 18,
-      housing: false,
-      specialty: 'Caldeireiro',
-      duration: '3 meses',
-      publishedAt: 'Há 5 horas',
-    },
-    {
-      title: 'Tubista — Plataforma Offshore',
-      company: 'NorthSea Works',
-      companyScore: 4.9,
-      location: 'Aberdeen, UK',
-      rateMin: 35,
-      rateMax: 42,
-      housing: true,
-      specialty: 'Tubista',
-      duration: '4 semanas rotação',
-      publishedAt: 'Ontem',
-    },
-  ]
+export default async function JobsPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string>
+}) {
+  const jobs: JobItem[] = await getJobs(searchParams)
+  const activeSpecialty = searchParams.specialty ?? ''
 
   return (
     <div className="min-h-screen bg-metal-950 text-white">
-      {/* Navbar */}
-      <nav className="border-b border-metal-800 px-6 py-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <Link href="/" className="text-xl font-bold">
-            Metal<span className="text-orange-500">Clean</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm text-metal-300 hover:text-white">Entrar</Link>
-            <Link href="/register" className="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold hover:bg-orange-600">
-              Registar
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="mx-auto max-w-5xl px-4 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Ofertas de Trabalho</h1>
-          <p className="mt-1 text-metal-400">{jobs.length} vagas publicadas · Valor/hora explícito em todas as ofertas</p>
+          <p className="mt-1 text-metal-400">
+            {jobs.length} {jobs.length === 1 ? 'vaga disponível' : 'vagas disponíveis'} · Valor/hora
+            explícito em todas as ofertas
+          </p>
         </div>
 
         {/* Filters */}
-        <div className="mb-6 flex flex-wrap gap-3">
-          {['Todos', 'TIG', 'MIG/MAG', 'Caldeireiro', 'Tubista'].map((f) => (
-            <button
-              key={f}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                f === 'Todos'
-                  ? 'bg-orange-500 text-white'
-                  : 'border border-metal-700 text-metal-400 hover:border-metal-500 hover:text-white'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-2">
-            <label className="text-sm text-metal-400">Min. €/h:</label>
-            <input
-              type="number"
-              placeholder="0"
-              className="w-20 rounded-lg border border-metal-700 bg-metal-800 px-3 py-1.5 text-sm text-white"
-            />
+        <form method="get" className="mb-6">
+          <div className="flex flex-wrap items-center gap-3">
+            {SPECIALTY_FILTERS.map((f) => (
+              <Link
+                key={f.value}
+                href={f.value ? `/jobs?specialty=${f.value}` : '/jobs'}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  activeSpecialty === f.value
+                    ? 'bg-orange-500 text-white'
+                    : 'border border-metal-700 text-metal-400 hover:border-metal-500 hover:text-white'
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+            <label className="ml-auto flex items-center gap-2 text-sm text-metal-400">
+              Alojamento incluído
+              <Link
+                href={searchParams.housing ? '/jobs' : '/jobs?housing=1'}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  searchParams.housing ? 'bg-orange-500' : 'bg-metal-700'
+                }`}
+              >
+                <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                  searchParams.housing ? 'translate-x-5' : 'translate-x-1'
+                }`} />
+              </Link>
+            </label>
           </div>
-        </div>
+        </form>
 
         {/* Job list */}
         <div className="space-y-3">
-          {jobs.map((job, i) => <JobCard key={i} {...job} />)}
+          {jobs.length === 0 ? (
+            <div className="rounded-xl border border-metal-700 bg-metal-900 p-10 text-center">
+              <p className="text-metal-400">Nenhuma vaga encontrada com esses critérios.</p>
+              <Link href="/jobs" className="mt-3 inline-block text-sm text-orange-400 hover:underline">
+                Ver todas as vagas
+              </Link>
+            </div>
+          ) : (
+            jobs.map((job) => (
+              <article
+                key={job.id}
+                className="group rounded-xl border border-metal-700 bg-metal-900 p-5 transition-all hover:border-orange-500/50 hover:bg-metal-800"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="rounded bg-metal-700 px-2 py-0.5 text-xs font-medium text-metal-300">
+                        {SPECIALTY_LABELS[job.specialtyRequired] ?? job.specialtyRequired}
+                      </span>
+                      {job.housingIncluded && (
+                        <span className="rounded bg-green-900/50 px-2 py-0.5 text-xs font-medium text-green-400">
+                          Alojamento
+                        </span>
+                      )}
+                      {job.company.taxIdVerified && (
+                        <span className="rounded bg-blue-900/50 px-2 py-0.5 text-xs font-medium text-blue-400">
+                          ✓ NIF
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-semibold text-white group-hover:text-orange-400">
+                      {job.title}
+                    </h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-metal-400">
+                      <Link href={`/companies/${job.company.slug}`} className="hover:text-white">
+                        {job.company.companyName}
+                      </Link>
+                      {job.company.scoreAvg && (
+                        <>
+                          <span>·</span>
+                          <ScoreBadge score={job.company.scoreAvg} reviewCount={job.company.reviewCount} size="sm" />
+                        </>
+                      )}
+                      <span>·</span>
+                      <span>📍 {job.workLocationCity}, {job.workLocationCountry}</span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-lg font-bold text-orange-400">
+                      {formatRate(job.hourlyRateMin, job.hourlyRateMax)}
+                    </p>
+                    {job.estimatedDurationWeeks && (
+                      <p className="text-xs text-metal-500">{job.estimatedDurationWeeks} semanas</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs text-metal-600">
+                    {job.applicationCount} candidaturas
+                  </span>
+                  <Link
+                    href={`/jobs/${job.id}`}
+                    className="rounded-md bg-orange-500/10 px-3 py-1.5 text-xs font-semibold text-orange-400 ring-1 ring-orange-500/20 transition-colors hover:bg-orange-500 hover:text-white"
+                  >
+                    Ver oferta
+                  </Link>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </div>
     </div>

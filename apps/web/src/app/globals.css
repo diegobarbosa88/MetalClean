@@ -58,3 +58,9 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-metal-700 bg-metal-800 px-3 py-2.5 text-sm text-white placeholder-metal-500 focus:border-orange-500 focus:outline-none transition-colors;
+  }
+}

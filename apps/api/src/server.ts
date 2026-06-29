@@ -12,7 +12,17 @@ import { config } from './config.js'
 import { prisma } from './lib/prisma.js'
 import { authenticatePlugin } from './plugins/authenticate.js'
 import { errorHandlerPlugin } from './plugins/error-handler.js'
+
 import { authRoutes } from './modules/auth/auth.routes.js'
+import { workersRoutes } from './modules/workers/workers.routes.js'
+import { companiesRoutes } from './modules/companies/companies.routes.js'
+import { jobsRoutes } from './modules/jobs/jobs.routes.js'
+import { applicationsRoutes } from './modules/applications/applications.routes.js'
+import { matchesRoutes } from './modules/matches/matches.routes.js'
+import { reviewsRoutes } from './modules/reviews/reviews.routes.js'
+import { postsRoutes } from './modules/posts/posts.routes.js'
+import { notificationsRoutes } from './modules/notifications/notifications.routes.js'
+import { uploadsRoutes } from './modules/uploads/uploads.routes.js'
 
 const fastify = Fastify({
   logger: {
@@ -24,52 +34,68 @@ const fastify = Fastify({
   },
 })
 
-// Decorate config onto the instance
 fastify.decorate('config', config)
 
 async function bootstrap() {
-  // Security
   await fastify.register(helmet, { contentSecurityPolicy: false })
   await fastify.register(cors, {
     origin: [config.frontendUrl, /localhost:\d+/],
     credentials: true,
   })
   await fastify.register(rateLimit, {
-    max: 100,
+    max: 200,
     timeWindow: '1 minute',
     keyGenerator: (req) => req.ip,
   })
+  await fastify.register(jwt, { secret: config.jwt.secret })
 
-  // JWT
-  await fastify.register(jwt, {
-    secret: config.jwt.secret,
-  })
-
-  // Swagger docs
   await fastify.register(swagger, {
     openapi: {
-      info: { title: 'MetalClean API', version: '0.1.0', description: 'API da plataforma MetalClean' },
+      info: { title: 'MetalClean API', version: '1.0.0', description: 'API da plataforma MetalClean — metalomecânica' },
       servers: [{ url: `http://localhost:${config.port}` }],
       components: {
         securitySchemes: {
           bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         },
       },
+      tags: [
+        { name: 'Auth', description: 'Autenticação e sessão' },
+        { name: 'Workers', description: 'Perfis de trabalhadores' },
+        { name: 'Companies', description: 'Perfis de empresas' },
+        { name: 'Jobs', description: 'Ofertas de trabalho' },
+        { name: 'Applications', description: 'Candidaturas' },
+        { name: 'Matches', description: 'Contratos confirmados' },
+        { name: 'Reviews', description: 'Sistema de avaliação' },
+        { name: 'Posts', description: 'Feed social' },
+        { name: 'Notifications', description: 'Notificações' },
+        { name: 'Uploads', description: 'Upload de ficheiros' },
+        { name: 'Moderation', description: 'Moderação de conteúdo' },
+      ],
     },
   })
   await fastify.register(swaggerUi, { routePrefix: '/docs' })
 
-  // Plugins
   await fastify.register(authenticatePlugin)
   await fastify.register(errorHandlerPlugin)
 
-  // Routes
-  await fastify.register(authRoutes, { prefix: '/api/v1' })
+  const PREFIX = '/api/v1'
+  await fastify.register(authRoutes, { prefix: PREFIX })
+  await fastify.register(workersRoutes, { prefix: PREFIX })
+  await fastify.register(companiesRoutes, { prefix: PREFIX })
+  await fastify.register(jobsRoutes, { prefix: PREFIX })
+  await fastify.register(applicationsRoutes, { prefix: PREFIX })
+  await fastify.register(matchesRoutes, { prefix: PREFIX })
+  await fastify.register(reviewsRoutes, { prefix: PREFIX })
+  await fastify.register(postsRoutes, { prefix: PREFIX })
+  await fastify.register(notificationsRoutes, { prefix: PREFIX })
+  await fastify.register(uploadsRoutes, { prefix: PREFIX })
 
-  // Health check
-  fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
+  fastify.get('/health', async () => ({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+  }))
 
-  // Graceful shutdown
   const shutdown = async () => {
     fastify.log.info('Shutting down...')
     await fastify.close()
@@ -81,7 +107,7 @@ async function bootstrap() {
 
   try {
     await fastify.listen({ port: config.port, host: '0.0.0.0' })
-    fastify.log.info(`MetalClean API running on port ${config.port}`)
+    fastify.log.info(`MetalClean API running → http://localhost:${config.port}/docs`)
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)
