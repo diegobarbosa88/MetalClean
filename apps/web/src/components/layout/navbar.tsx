@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const navLinks = [
+  { href: '/search', label: 'Pesquisa' },
   { href: '/jobs', label: 'Vagas' },
   { href: '/workers', label: 'Profissionais' },
   { href: '/feed', label: 'Feed' },
@@ -43,7 +44,9 @@ export function Navbar({ isAuthenticated = false }: { isAuthenticated?: boolean 
             <>
               <Link href="/dashboard" className="text-sm text-metal-300 hover:text-white">Dashboard</Link>
               <Link href="/messages" className="text-sm text-metal-300 hover:text-white">Mensagens</Link>
+              <Link href="/analytics" className="text-sm text-metal-300 hover:text-white">Analytics</Link>
               <Link href="/profile/edit" className="text-sm text-metal-300 hover:text-white">Perfil</Link>
+              <Link href="/settings/privacy" className="text-sm text-metal-300 hover:text-white">Privacidade</Link>
               <button
                 onClick={() => { localStorage.removeItem('mc_token'); window.location.href = '/login' }}
                 className="text-sm text-metal-400 hover:text-white"

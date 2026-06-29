@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js'
 import { createUniqueSlug } from '../../lib/slugify.js'
+import { meili, JOBS_INDEX, jobToDocument } from '../../lib/meilisearch.js'
 import type { CreateJobInput, UpdateJobStatusInput, JobSearchInput } from '@metalclean/validators/job'
 
 export class JobsService {
@@ -37,6 +38,13 @@ export class JobsService {
       },
       include: { company: { select: { companyName: true, slug: true, logoUrl: true } } },
     })
+
+    // Sync Meilisearch (apenas quando publicado)
+    if (input.status === undefined || input.status === 'published') {
+      // Já em estado draft — não indexar ainda
+    }
+
+    return job
   }
 
   async updateStatus(userId: string, jobId: string, input: UpdateJobStatusInput) {
@@ -46,13 +54,22 @@ export class JobsService {
     const job = await prisma.jobPosting.findFirst({ where: { id: jobId, companyId: company.id } })
     if (!job) throw { statusCode: 404, message: 'Vaga não encontrada.' }
 
-    return prisma.jobPosting.update({
+    const updated = await prisma.jobPosting.update({
       where: { id: jobId },
       data: {
         status: input.status,
         ...(input.status === 'published' && !job.publishedAt && { publishedAt: new Date() }),
       },
+      include: { company: { select: { companyName: true, slug: true, logoUrl: true, scoreAvg: true } } },
     })
+
+    if (input.status === 'published') {
+      meili.index(JOBS_INDEX).addDocuments([jobToDocument(updated as Record<string, unknown>)]).catch(() => {})
+    } else {
+      meili.index(JOBS_INDEX).deleteDocument(jobId).catch(() => {})
+    }
+
+    return updated
   }
 
   async getById(jobId: string, requestingUserId?: string) {

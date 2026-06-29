@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js'
 import { createUniqueSlug } from '../../lib/slugify.js'
+import { meili, WORKERS_INDEX, workerToDocument } from '../../lib/meilisearch.js'
 import type { UpdateWorkerProfileInput, AddCertificationInput, WorkerSearchInput } from '@metalclean/validators/worker'
 
 export class WorkersService {
@@ -67,7 +68,10 @@ export class WorkersService {
         desiredHourlyRateMin: input.desiredHourlyRateMin ?? undefined,
         desiredHourlyRateMax: input.desiredHourlyRateMax ?? undefined,
       },
+      include: { certifications: { select: { standard: true } } },
     })
+
+    meili.index(WORKERS_INDEX).addDocuments([workerToDocument(updated as Record<string, unknown>)]).catch(() => {})
 
     return updated
   }

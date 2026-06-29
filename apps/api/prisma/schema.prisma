@@ -198,6 +198,7 @@ model User {
   notifications    Notification[]
   reportsSubmitted ModerationReport[] @relation("ReporterUser")
   reportsResolved  ModerationReport[] @relation("ResolverUser")
+  gdprRequests     GdprRequest[]
   matchCancellations Match[]     @relation("MatchCancelledBy")
   conversations1   Conversation[] @relation("ParticipantA")
   conversations2   Conversation[] @relation("ParticipantB")
@@ -314,6 +315,10 @@ model CompanyProfile {
   reviewCount             Int                @default(0)
   scoreAvg                Decimal?           @db.Decimal(3, 2)
 
+  stripeCustomerId        String?
+  subscriptionStatus      String             @default("free")
+  subscriptionExpiresAt   DateTime?
+
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
 
@@ -366,6 +371,9 @@ model JobPosting {
 
   viewCount                Int               @default(0)
   applicationCount         Int               @default(0)
+
+  isFeatured               Boolean           @default(false)
+  featuredUntil            DateTime?
 
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
@@ -638,4 +646,23 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+// ─── GDPR Requests ────────────────────────────────────────────────────────────
+
+model GdprRequest {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestType String    @db.VarChar(20)
+  status      String    @default("pending") @db.VarChar(20)
+  downloadUrl String?
+  notes       String?   @db.VarChar(1000)
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("gdpr_requests")
 }

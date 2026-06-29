@@ -25,6 +25,12 @@ import { postsRoutes } from './modules/posts/posts.routes.js'
 import { notificationsRoutes } from './modules/notifications/notifications.routes.js'
 import { uploadsRoutes } from './modules/uploads/uploads.routes.js'
 import { messagesRoutes } from './modules/messages/messages.routes.js'
+import { searchRoutes } from './modules/search/search.routes.js'
+import { billingRoutes } from './modules/billing/billing.routes.js'
+import { analyticsRoutes } from './modules/analytics/analytics.routes.js'
+import { moderationRoutes } from './modules/moderation/moderation.routes.js'
+import { gdprRoutes } from './modules/gdpr/gdpr.routes.js'
+import { setupMeilisearchIndexes } from './lib/meilisearch.js'
 
 const fastify = Fastify({
   logger: {
@@ -73,6 +79,10 @@ async function bootstrap() {
         { name: 'Notifications', description: 'Notificações' },
         { name: 'Uploads', description: 'Upload de ficheiros' },
         { name: 'Moderation', description: 'Moderação de conteúdo' },
+        { name: 'Search', description: 'Pesquisa unificada (Meilisearch)' },
+        { name: 'Billing', description: 'Subscrições e pagamentos (Stripe)' },
+        { name: 'Analytics', description: 'Analytics e estatísticas' },
+        { name: 'GDPR', description: 'Portabilidade e eliminação de dados' },
       ],
     },
   })
@@ -93,6 +103,11 @@ async function bootstrap() {
   await fastify.register(notificationsRoutes, { prefix: PREFIX })
   await fastify.register(uploadsRoutes, { prefix: PREFIX })
   await fastify.register(messagesRoutes, { prefix: PREFIX })
+  await fastify.register(searchRoutes, { prefix: PREFIX })
+  await fastify.register(billingRoutes, { prefix: PREFIX })
+  await fastify.register(analyticsRoutes, { prefix: PREFIX })
+  await fastify.register(moderationRoutes, { prefix: PREFIX })
+  await fastify.register(gdprRoutes, { prefix: PREFIX })
 
   fastify.get('/health', async () => ({
     status: 'ok',
@@ -110,6 +125,7 @@ async function bootstrap() {
   process.on('SIGINT', shutdown)
 
   try {
+    await setupMeilisearchIndexes().catch((err) => fastify.log.warn(err, 'Meilisearch setup failed — continuing without search'))
     await fastify.listen({ port: config.port, host: '0.0.0.0' })
 
     // Fase 2: Socket.IO attached to the same HTTP server after listen

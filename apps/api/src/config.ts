@@ -36,4 +36,15 @@ export const config = {
     bucketName: process.env['R2_BUCKET_NAME'] ?? 'metalclean-media',
     publicUrl: process.env['R2_PUBLIC_URL'] ?? '',
   },
+
+  meilisearch: {
+    host: process.env['MEILISEARCH_HOST'] ?? 'http://localhost:7700',
+    apiKey: process.env['MEILISEARCH_API_KEY'] ?? 'metalclean_meili_dev',
+  },
+
+  stripe: {
+    secretKey: process.env['STRIPE_SECRET_KEY'] ?? '',
+    webhookSecret: process.env['STRIPE_WEBHOOK_SECRET'] ?? '',
+    premiumPriceId: process.env['STRIPE_PREMIUM_PRICE_ID'] ?? '',
+  },
 } as const
