@@ -16,17 +16,7 @@ export async function workersRoutes(fastify: FastifyInstance) {
     handler: async (request) => svc.search(request.query),
   })
 
-  // Public: get worker profile by slug
-  fastify.get('/workers/:slug', {
-    schema: { tags: ['Workers'], summary: 'Perfil público do trabalhador', params: z.object({ slug: z.string() }) },
-    handler: async (request) => {
-      const { slug } = request.params as { slug: string }
-      const userId = (request.user as { sub?: string } | undefined)?.sub
-      return svc.getProfile(slug, userId)
-    },
-  })
-
-  // Authenticated: update own profile
+  // Authenticated: update own profile (before /:slug to avoid param capture)
   fastify.put('/workers/me', {
     schema: { tags: ['Workers'], summary: 'Atualizar perfil', security: [{ bearerAuth: [] }], body: UpdateWorkerProfileSchema },
     onRequest: [fastify.authenticate],
@@ -59,6 +49,16 @@ export async function workersRoutes(fastify: FastifyInstance) {
       const { certId } = request.params as { certId: string }
       const result = await svc.removeCertification(request.user.sub, certId)
       return reply.send(result)
+    },
+  })
+
+  // Public: get worker profile by slug (after /me routes)
+  fastify.get('/workers/:slug', {
+    schema: { tags: ['Workers'], summary: 'Perfil público do trabalhador', params: z.object({ slug: z.string() }) },
+    handler: async (request) => {
+      const { slug } = request.params as { slug: string }
+      const userId = (request.user as { sub?: string } | undefined)?.sub
+      return svc.getProfile(slug, userId)
     },
   })
 }

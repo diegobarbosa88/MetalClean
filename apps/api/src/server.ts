@@ -12,6 +12,7 @@ import { config } from './config.js'
 import { prisma } from './lib/prisma.js'
 import { authenticatePlugin } from './plugins/authenticate.js'
 import { errorHandlerPlugin } from './plugins/error-handler.js'
+import { createSocketServer } from './realtime/socket.js'
 
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { workersRoutes } from './modules/workers/workers.routes.js'
@@ -23,6 +24,7 @@ import { reviewsRoutes } from './modules/reviews/reviews.routes.js'
 import { postsRoutes } from './modules/posts/posts.routes.js'
 import { notificationsRoutes } from './modules/notifications/notifications.routes.js'
 import { uploadsRoutes } from './modules/uploads/uploads.routes.js'
+import { messagesRoutes } from './modules/messages/messages.routes.js'
 
 const fastify = Fastify({
   logger: {
@@ -67,6 +69,7 @@ async function bootstrap() {
         { name: 'Matches', description: 'Contratos confirmados' },
         { name: 'Reviews', description: 'Sistema de avaliação' },
         { name: 'Posts', description: 'Feed social' },
+        { name: 'Messages', description: 'Mensagens diretas' },
         { name: 'Notifications', description: 'Notificações' },
         { name: 'Uploads', description: 'Upload de ficheiros' },
         { name: 'Moderation', description: 'Moderação de conteúdo' },
@@ -89,6 +92,7 @@ async function bootstrap() {
   await fastify.register(postsRoutes, { prefix: PREFIX })
   await fastify.register(notificationsRoutes, { prefix: PREFIX })
   await fastify.register(uploadsRoutes, { prefix: PREFIX })
+  await fastify.register(messagesRoutes, { prefix: PREFIX })
 
   fastify.get('/health', async () => ({
     status: 'ok',
@@ -107,7 +111,12 @@ async function bootstrap() {
 
   try {
     await fastify.listen({ port: config.port, host: '0.0.0.0' })
+
+    // Fase 2: Socket.IO attached to the same HTTP server after listen
+    createSocketServer(fastify.server, fastify)
+
     fastify.log.info(`MetalClean API running → http://localhost:${config.port}/docs`)
+    fastify.log.info(`Socket.IO ready → ws://localhost:${config.port}/socket.io`)
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)

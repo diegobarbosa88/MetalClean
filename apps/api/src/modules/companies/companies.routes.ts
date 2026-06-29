@@ -11,15 +11,7 @@ export async function companiesRoutes(fastify: FastifyInstance) {
     handler: async (request) => svc.search(request.query),
   })
 
-  fastify.get('/companies/:slug', {
-    schema: { tags: ['Companies'], summary: 'Perfil público da empresa', params: z.object({ slug: z.string() }) },
-    handler: async (request) => {
-      const { slug } = request.params as { slug: string }
-      const userId = (request.user as { sub?: string } | undefined)?.sub
-      return svc.getProfile(slug, userId)
-    },
-  })
-
+  // Authenticated: update company profile (before /:slug to avoid param capture)
   fastify.put('/companies/me', {
     schema: { tags: ['Companies'], summary: 'Atualizar perfil da empresa', security: [{ bearerAuth: [] }], body: UpdateCompanyProfileSchema },
     onRequest: [fastify.authenticate],
@@ -29,6 +21,16 @@ export async function companiesRoutes(fastify: FastifyInstance) {
       }
       const result = await svc.updateProfile(request.user.sub, request.body)
       return reply.send(result)
+    },
+  })
+
+  // Public: company profile by slug (after /me)
+  fastify.get('/companies/:slug', {
+    schema: { tags: ['Companies'], summary: 'Perfil público da empresa', params: z.object({ slug: z.string() }) },
+    handler: async (request) => {
+      const { slug } = request.params as { slug: string }
+      const userId = (request.user as { sub?: string } | undefined)?.sub
+      return svc.getProfile(slug, userId)
     },
   })
 }

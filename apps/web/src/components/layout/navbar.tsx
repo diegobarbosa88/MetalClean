@@ -43,6 +43,7 @@ export function Navbar({ isAuthenticated = false }: { isAuthenticated?: boolean 
             <>
               <Link href="/dashboard" className="text-sm text-metal-300 hover:text-white">Dashboard</Link>
               <Link href="/messages" className="text-sm text-metal-300 hover:text-white">Mensagens</Link>
+              <Link href="/profile/edit" className="text-sm text-metal-300 hover:text-white">Perfil</Link>
               <button
                 onClick={() => { localStorage.removeItem('mc_token'); window.location.href = '/login' }}
                 className="text-sm text-metal-400 hover:text-white"

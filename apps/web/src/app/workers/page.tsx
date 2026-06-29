@@ -20,7 +20,8 @@ async function getWorkers(searchParams: Record<string, string>) {
 
   const res = await fetch(`${API}/workers?${params.toString()}`, { next: { revalidate: 60 } })
   if (!res.ok) return []
-  return res.json()
+  const json = await res.json()
+  return Array.isArray(json) ? json : (json.data ?? [])
 }
 
 const SPECIALTY_FILTERS = [
