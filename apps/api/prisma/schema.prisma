@@ -1,0 +1,641 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AccountType {
+  worker
+  company
+  admin
+}
+
+enum WorkerSpecialty {
+  tig_welder
+  mig_mag_welder
+  electrode_welder
+  boilermaker
+  pipe_fitter
+  structural_fitter
+  cnc_operator
+  other
+}
+
+enum AvailabilityStatus {
+  available
+  working
+  not_looking
+}
+
+enum ContractPreference {
+  subcontract
+  permanent
+  both
+}
+
+enum CompanyType {
+  main_contractor
+  subcontractor
+  both
+  temp_agency
+  epc
+}
+
+enum EmployeeCountRange {
+  range_1_10     @map("1-10")
+  range_11_50    @map("11-50")
+  range_51_200   @map("51-200")
+  range_201_500  @map("201-500")
+  range_500_plus @map("500+")
+}
+
+enum IndustrySector {
+  oil_gas
+  petrochemical
+  shipbuilding
+  civil
+  energy
+  food_beverage
+  pharma
+  other
+}
+
+enum JobStatus {
+  draft
+  published
+  paused
+  filled
+  cancelled
+  expired
+}
+
+enum ShiftPattern {
+  day
+  night
+  rotating
+  offshore
+}
+
+enum HousingQuality {
+  shared_room
+  single_room
+  apartment
+  hotel
+}
+
+enum MaterialType {
+  carbon_steel
+  stainless
+  duplex
+  aluminium
+  titanium
+  inconel
+  other
+}
+
+enum ApplicationStatus {
+  pending
+  viewed
+  shortlisted
+  rejected
+  withdrawn
+  matched
+}
+
+enum MatchStatus {
+  pending_worker
+  active
+  completed
+  cancelled
+  disputed
+}
+
+enum ReviewStatus {
+  submitted
+  published
+  under_review
+  removed
+  appealed
+}
+
+enum ReviewerType {
+  company
+  worker
+}
+
+enum PostType {
+  general
+  portfolio_work
+  job_update
+  news
+  certification
+}
+
+enum PostVisibility {
+  public
+  connections
+  private
+}
+
+enum ModerationStatus {
+  ok
+  under_review
+  removed
+}
+
+enum ReportTargetType {
+  review
+  post
+  comment
+  profile
+  message
+}
+
+enum ReportReason {
+  defamation
+  false_information
+  harassment
+  spam
+  inappropriate_content
+  other
+}
+
+enum ReportStatus {
+  pending
+  under_review
+  resolved_kept
+  resolved_removed
+  escalated
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String      @unique
+  phone            String?     @unique
+  passwordHash     String
+  accountType      AccountType
+  isVerified       Boolean     @default(false)
+  verificationToken String?
+  isActive         Boolean     @default(true)
+  lastLoginAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  deletedAt        DateTime?
+
+  workerProfile    WorkerProfile?
+  companyProfile   CompanyProfile?
+  reviewsGiven     Review[]       @relation("ReviewerUser")
+  reviewsReceived  Review[]       @relation("RevieweeUser")
+  postsAuthored    Post[]
+  sentMessages     Message[]
+  notifications    Notification[]
+  reportsSubmitted ModerationReport[] @relation("ReporterUser")
+  reportsResolved  ModerationReport[] @relation("ResolverUser")
+  matchCancellations Match[]     @relation("MatchCancelledBy")
+  conversations1   Conversation[] @relation("ParticipantA")
+  conversations2   Conversation[] @relation("ParticipantB")
+  postLikes        PostLike[]
+  postComments     PostComment[]
+
+  @@index([email])
+  @@index([accountType])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// ─── Worker Profile ───────────────────────────────────────────────────────────
+
+model WorkerProfile {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String              @unique @db.Uuid
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName              String
+  slug                  String              @unique
+  avatarUrl             String?
+  coverUrl              String?
+  headline              String?             @db.VarChar(160)
+  bio                   String?             @db.VarChar(2000)
+  locationCity          String?
+  locationCountry       String              @default("PT")
+  nationality           String?
+  birthYear             Int?                @db.SmallInt
+
+  primarySpecialty      WorkerSpecialty
+  secondarySpecialties  WorkerSpecialty[]
+  yearsExperience       Int?                @db.SmallInt
+
+  availabilityStatus    AvailabilityStatus  @default(available)
+  availableFrom         DateTime?           @db.Date
+  preferredContractType ContractPreference?
+  desiredHourlyRateMin  Decimal?            @db.Decimal(8, 2)
+  desiredHourlyRateMax  Decimal?            @db.Decimal(8, 2)
+  willingToRelocate     Boolean             @default(true)
+  preferredLocations    String[]
+
+  hasOwnTools           Boolean             @default(false)
+  equipmentList         String[]
+
+  reviewCount           Int                 @default(0)
+  scoreAvg              Decimal?            @db.Decimal(3, 2)
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  certifications        WorkerCertification[]
+  applications          JobApplication[]
+  matches               Match[]             @relation("WorkerMatch")
+
+  @@index([userId])
+  @@index([slug])
+  @@index([primarySpecialty])
+  @@index([availabilityStatus])
+  @@index([locationCountry, locationCity])
+  @@map("worker_profiles")
+}
+
+model WorkerCertification {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workerId       String        @db.Uuid
+  worker         WorkerProfile @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  standard       String        @db.VarChar(50)
+  processCode    String?       @db.VarChar(20)
+  materialGroup  String?       @db.VarChar(20)
+  position       String?       @db.VarChar(20)
+  issuedBy       String        @db.VarChar(100)
+  issueDate      DateTime      @db.Date
+  expiryDate     DateTime?     @db.Date
+  certificateUrl String?
+  isVerified     Boolean       @default(false)
+
+  createdAt      DateTime      @default(now())
+
+  @@index([workerId])
+  @@index([standard])
+  @@index([expiryDate])
+  @@map("worker_certifications")
+}
+
+// ─── Company Profile ──────────────────────────────────────────────────────────
+
+model CompanyProfile {
+  id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String             @unique @db.Uuid
+  user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyName             String
+  slug                    String             @unique
+  logoUrl                 String?
+  coverUrl                String?
+  bio                     String?            @db.VarChar(3000)
+  taxId                   String?            @unique
+  taxIdVerified           Boolean            @default(false)
+  foundedYear             Int?               @db.SmallInt
+
+  employeeCountRange      EmployeeCountRange?
+  companyType             CompanyType?
+  sectors                 IndustrySector[]
+
+  locationAddress         String?
+  locationCity            String
+  locationCountry         String             @default("PT")
+  website                 String?
+  linkedinUrl             String?
+  currentProjectsSummary  String?            @db.VarChar(500)
+
+  reviewCount             Int                @default(0)
+  scoreAvg                Decimal?           @db.Decimal(3, 2)
+
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  jobPostings             JobPosting[]
+  matches                 Match[]            @relation("CompanyMatch")
+
+  @@index([userId])
+  @@index([slug])
+  @@index([locationCountry, locationCity])
+  @@map("company_profiles")
+}
+
+// ─── Job Postings ─────────────────────────────────────────────────────────────
+
+model JobPosting {
+  id                       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId                String            @db.Uuid
+  company                  CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  title                    String
+  slug                     String            @unique
+  description              String
+  specialtyRequired        WorkerSpecialty
+  specialtiesAccepted      WorkerSpecialty[]
+  requiredCertifications   Json              @default("[]")
+  minYearsExperience       Int?              @db.SmallInt
+  ownToolsRequired         Boolean           @default(false)
+
+  hourlyRateMin            Decimal           @db.Decimal(8, 2)
+  hourlyRateMax            Decimal?          @db.Decimal(8, 2)
+  currency                 String            @default("EUR") @db.Char(3)
+  rateIncludesTax          Boolean           @default(false)
+
+  subsidenceDaily          Decimal?          @db.Decimal(8, 2)
+  housingIncluded          Boolean           @default(false)
+  housingQuality           HousingQuality?
+  transportIncluded        Boolean           @default(false)
+
+  projectName              String?
+  workLocationCity         String
+  workLocationCountry      String            @default("PT")
+  startDate                DateTime?         @db.Date
+  estimatedDurationWeeks   Int?              @db.SmallInt
+  shiftPattern             ShiftPattern?
+  materialTypes            MaterialType[]
+
+  status                   JobStatus         @default(draft)
+  publishedAt              DateTime?
+  expiresAt                DateTime?
+
+  viewCount                Int               @default(0)
+  applicationCount         Int               @default(0)
+
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  deletedAt                DateTime?
+
+  applications             JobApplication[]
+  matches                  Match[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([specialtyRequired])
+  @@index([workLocationCountry, workLocationCity])
+  @@index([hourlyRateMin])
+  @@map("job_postings")
+}
+
+// ─── Applications ─────────────────────────────────────────────────────────────
+
+model JobApplication {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId        String            @db.Uuid
+  job          JobPosting        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workerId     String            @db.Uuid
+  worker       WorkerProfile     @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  coverNote    String?
+  proposedRate Decimal?          @db.Decimal(8, 2)
+  status       ApplicationStatus @default(pending)
+  appliedAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  match        Match?
+
+  @@unique([jobId, workerId])
+  @@index([jobId])
+  @@index([workerId])
+  @@index([status])
+  @@map("job_applications")
+}
+
+// ─── Matches ──────────────────────────────────────────────────────────────────
+
+model Match {
+  id                      String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId                   String?        @db.Uuid
+  job                     JobPosting?    @relation(fields: [jobId], references: [id])
+  applicationId           String?        @unique @db.Uuid
+  application             JobApplication? @relation(fields: [applicationId], references: [id])
+  companyId               String         @db.Uuid
+  company                 CompanyProfile @relation("CompanyMatch", fields: [companyId], references: [id])
+  workerId                String         @db.Uuid
+  worker                  WorkerProfile  @relation("WorkerMatch", fields: [workerId], references: [id])
+
+  confirmedHourlyRate     Decimal        @db.Decimal(8, 2)
+  currency                String         @default("EUR") @db.Char(3)
+  workLocationCity        String
+  workLocationCountry     String         @default("PT")
+  startDate               DateTime?      @db.Date
+  endDate                 DateTime?      @db.Date
+  actualEndDate           DateTime?      @db.Date
+  housingIncluded         Boolean        @default(false)
+
+  status                  MatchStatus    @default(pending_worker)
+  confirmedAt             DateTime?
+  completedAt             DateTime?
+  cancelledAt             DateTime?
+  cancelledById           String?        @db.Uuid
+  cancelledBy             User?          @relation("MatchCancelledBy", fields: [cancelledById], references: [id])
+  cancellationReason      String?
+
+  companyCanReviewUntil   DateTime?
+  workerCanReviewUntil    DateTime?
+
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  reviews                 Review[]
+
+  @@index([companyId])
+  @@index([workerId])
+  @@index([status])
+  @@index([completedAt])
+  @@map("matches")
+}
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+
+model Review {
+  id                      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  matchId                 String       @db.Uuid
+  match                   Match        @relation(fields: [matchId], references: [id])
+  reviewerUserId          String       @db.Uuid
+  reviewerUser            User         @relation("ReviewerUser", fields: [reviewerUserId], references: [id])
+  revieweeUserId          String       @db.Uuid
+  revieweeUser            User         @relation("RevieweeUser", fields: [revieweeUserId], references: [id])
+  reviewerType            ReviewerType
+
+  // Worker evaluation criteria (filled by company)
+  scoreAttendance         Int?         @db.SmallInt
+  scoreTechnicalQuality   Int?         @db.SmallInt
+  scoreSafetyCompliance   Int?         @db.SmallInt
+  scoreAttitudeTeamwork   Int?         @db.SmallInt
+
+  // Company evaluation criteria (filled by worker)
+  scorePaymentPunctuality Int?         @db.SmallInt
+  scoreRateCompliance     Int?         @db.SmallInt
+  scoreSafetyConditions   Int?         @db.SmallInt
+  scoreHousingAllowances  Int?         @db.SmallInt
+
+  writtenReview           String?      @db.VarChar(1000)
+  overallScore            Decimal      @db.Decimal(3, 2)
+
+  isVisible               Boolean      @default(true)
+  status                  ReviewStatus @default(submitted)
+
+  responseText            String?      @db.VarChar(500)
+  responseAt              DateTime?
+
+  submittedAt             DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  @@unique([matchId, reviewerUserId])
+  @@index([matchId])
+  @@index([revieweeUserId])
+  @@index([reviewerType])
+  @@index([status])
+  @@map("reviews")
+}
+
+// ─── Posts ────────────────────────────────────────────────────────────────────
+
+model Post {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorUserId     String           @db.Uuid
+  author           User             @relation(fields: [authorUserId], references: [id])
+  authorType       String           @db.VarChar(10)
+
+  contentText      String?          @db.VarChar(2000)
+  postType         PostType         @default(general)
+  media            Json             @default("[]")
+  likeCount        Int              @default(0)
+  commentCount     Int              @default(0)
+  visibility       PostVisibility   @default(public)
+  moderationStatus ModerationStatus @default(ok)
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  likes            PostLike[]
+  comments         PostComment[]
+
+  @@index([authorUserId])
+  @@index([postType])
+  @@index([createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+model PostLike {
+  postId    String   @db.Uuid
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([postId, userId])
+  @@map("post_likes")
+}
+
+model PostComment {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId           String           @db.Uuid
+  post             Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorUserId     String           @db.Uuid
+  author           User             @relation(fields: [authorUserId], references: [id])
+  parentId         String?          @db.Uuid
+  parent           PostComment?     @relation("CommentReplies", fields: [parentId], references: [id])
+  replies          PostComment[]    @relation("CommentReplies")
+
+  content          String           @db.VarChar(1000)
+  moderationStatus ModerationStatus @default(ok)
+  createdAt        DateTime         @default(now())
+  deletedAt        DateTime?
+
+  @@index([postId])
+  @@index([authorUserId])
+  @@map("post_comments")
+}
+
+// ─── Messaging ────────────────────────────────────────────────────────────────
+
+model Conversation {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  participantAId       String    @db.Uuid
+  participantA         User      @relation("ParticipantA", fields: [participantAId], references: [id])
+  participantBId       String    @db.Uuid
+  participantB         User      @relation("ParticipantB", fields: [participantBId], references: [id])
+  lastMessageAt        DateTime?
+  lastMessagePreview   String?   @db.VarChar(200)
+  createdAt            DateTime  @default(now())
+
+  messages             Message[]
+
+  @@unique([participantAId, participantBId])
+  @@index([participantAId, lastMessageAt(sort: Desc)])
+  @@index([participantBId, lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String       @db.Uuid
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  content        String       @db.VarChar(5000)
+  attachmentUrl  String?
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  deletedAt      DateTime?
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+// ─── Moderation ───────────────────────────────────────────────────────────────
+
+model ModerationReport {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reporterUserId  String           @db.Uuid
+  reporter        User             @relation("ReporterUser", fields: [reporterUserId], references: [id])
+
+  targetType      ReportTargetType
+  targetId        String           @db.Uuid
+  reason          ReportReason
+  description     String?          @db.VarChar(1000)
+  status          ReportStatus     @default(pending)
+
+  resolvedById    String?          @db.Uuid
+  resolvedBy      User?            @relation("ResolverUser", fields: [resolvedById], references: [id])
+  resolutionNotes String?
+
+  createdAt       DateTime         @default(now())
+  resolvedAt      DateTime?
+
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([reporterUserId])
+  @@map("moderation_reports")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      String
+  title     String
+  body      String
+  data      Json     @default("{}")
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isRead])
+  @@map("notifications")
+}

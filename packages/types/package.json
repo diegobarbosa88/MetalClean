@@ -1,0 +1,15 @@
+{
+  "name": "@metalclean/types",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@metalclean/typescript-config": "workspace:*",
+    "typescript": "^5.6.3"
+  }
+}
